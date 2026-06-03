@@ -14,4 +14,4 @@ def test_request_body_validation():
         validate_body(valid_data)
         assert True, "Validation should pass for valid data"
     except ValidationError as e:
-        assert False, f"Validation failed for valid data: {e}"
+        assert AssertionError(), f"Validation failed for valid data: {e}"
