@@ -1,7 +1,7 @@
-import azure.functions as func
 import logging
-from jsonschema import validate, ValidationError
-from typing import Any
+
+import azure.functions as func
+from jsonschema import ValidationError
 
 from esquecimento_registro.json_schema import validate_body_json_schema as validate_body
 

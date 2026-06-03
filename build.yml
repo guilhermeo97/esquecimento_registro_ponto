@@ -1,0 +1,93 @@
+pr:
+  branches:
+    include:
+      - main
+
+trigger: none
+
+variables:
+  - group: "build"
+  
+  - name: automationName
+    value: $(Build.Repository.Name)
+
+  - name: functionAppName
+    value: "func-$(automationName)"
+
+  - name: vmImageName
+    value: "ubuntu-latest"
+
+  - name: workingDirectory
+    value: "."
+
+  - name: pythonVersion
+    value: "3.12"
+
+stages:
+  - stage: Build
+    displayName: Build stage
+
+    jobs:
+      - job: Build
+        displayName: Build
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - bash: |
+              if [ -f extensions.csproj ]
+              then
+                  dotnet build extensions.csproj --runtime ubuntu.22.04-x64 --output ./bin 
+              fi
+            workingDirectory: $(workingDirectory)
+            displayName: "Build extensions"
+
+          - task: UsePythonVersion@0
+            displayName: "Use Python $(pythonVersion)"
+            inputs:
+              versionSpec: "$(pythonVersion)"
+
+          - task: PipAuthenticate@1
+            inputs:
+              artifactFeeds: "$(feedName)"
+
+          - bash: |
+              python -m pip install --upgrade pip
+              pip install -v -r requirements.txt \
+                --extra-index-url https://pypi.org/simple \
+                --only-binary=:all: \
+                --target=".python_packages/lib/site-packages"
+
+            workingDirectory: $(workingDirectory)
+            displayName: "Install application dependencies"
+
+          - bash: |
+              pip install pytest ruff pyright \
+                --extra-index-url https://pypi.org/simple
+            workingDirectory: $(workingDirectory)
+            displayName: "Install CI tools"
+
+          - bash: |
+              ruff check .
+            workingDirectory: $(workingDirectory)
+            displayName: "Run linter"
+
+          - bash: |
+              pyright
+            workingDirectory: $(workingDirectory)
+            displayName: "Run type checker"
+
+          - bash: |
+              python -m pytest --maxfail=0 --disable-warnings -q
+            workingDirectory: $(workingDirectory)
+            displayName: "Run unit tests"
+          - task: ArchiveFiles@2
+            displayName: "Archive files"
+            inputs:
+              rootFolderOrFile: "$(workingDirectory)"
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/$(automationName)-$(Build.BuildId).zip
+              replaceExistingArchive: true
+          - publish: $(Build.ArtifactStagingDirectory)/$(automationName)-$(Build.BuildId).zip
+            artifact: drop

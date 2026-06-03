@@ -1,5 +1,7 @@
-from jsonschema import validate, ValidationError
 from typing import Any
+
+from jsonschema import validate
+
 
 def validate_body_json_schema(body: dict[str, Any]) -> None:
     """Validates schema of the request body."""

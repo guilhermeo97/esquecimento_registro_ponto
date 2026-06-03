@@ -1,0 +1,105 @@
+trigger: none
+
+parameters:
+  - name: environment
+    type: string
+    default: "dev"
+    values:
+      - dev
+      - prd
+
+  - name: automationName
+    type: string
+    default: ""
+
+  - name: buildId
+    type: number
+
+  - name: pipelineId
+    type: number
+
+variables:
+  - group: "deploy"
+
+  - name: functionAppName
+    value: "func-${{ parameters.automationName }}-${{ parameters.environment }}"
+
+  - name: vmImageName
+    value: "ubuntu-latest"
+
+  - name: fileName
+    value: "${{ parameters.automationName }}-${{ parameters.buildId }}.zip"
+
+  - name: filePathName
+    value: "$(Pipeline.Workspace)/drop/${{ parameters.automationName }}-${{ parameters.buildId }}.zip"
+
+  - ${{ if eq(parameters.environment, 'dev') }}:
+      - name: resourceGroup
+        value: $(resourceGroupDev)
+      - name: storageAccountName
+        value: $(storageAccountNameDev)
+      - name: appPackage
+        value: "app-package-$(functionAppName)-e41c123"
+
+  - ${{ if eq(parameters.environment, 'prd') }}:
+      - name: resourceGroup
+        value: $(resourceGroupPrd)
+      - name: storageAccountName
+        value: $(storageAccountNamePrd)
+      - name: appPackage
+        value: "app-package-$(functionAppName)-6381d2b"
+
+stages:
+  - stage: Deploy
+    displayName: Deploy stage
+
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy
+        environment: "development"
+        pool:
+          vmImage: $(vmImageName)
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download build artifacts"
+                  inputs:
+                    buildType: "specific"
+                    project: "Projetos de programação"
+                    artifactName: drop
+                    targetPath: "$(Pipeline.Workspace)/drop"
+                    definition: ${{ parameters.pipelineId }}
+                    pipelineId: ${{ parameters.buildId }}
+
+                - bash: |
+                    echo "Conteúdo do diretório de artefatos:"
+                    ls -la $(Pipeline.Workspace)/drop
+                  displayName: "Listar artefatos baixados"
+
+                - task: AzureCLI@2
+                  displayName: "Teste de autenticação Azure CLI"
+                  inputs:
+                    azureSubscription: "$(serviceConn)"
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      echo "Azure CLI autenticado"
+                      az account show
+
+                - task: AzureCLI@2
+                  displayName: "Deploy Azure Function (Run From Package)"
+                  inputs:
+                    azureSubscription: "$(serviceConn)"
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      echo "Atualizando pacote."
+                      az functionapp deployment source config-zip \
+                        --name $(functionAppName) \
+                        --resource-group $(resourceGroup) \
+                        --src $(filePathName) \
+
+                      echo "Deploy concluído com sucesso."
