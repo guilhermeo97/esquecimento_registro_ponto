@@ -1,0 +1,15 @@
+[project]
+requires-python = ">=3.12"
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B",]    # Regras: Erros (E), Pyflakes (F) e Isort (I)
+ignore = ["E501"]
+
+[tool.pyright]
+include = ["function_app.py"]           # Onde o Pyright deve procurar arquivos
+exclude = ["**/node_modules", "**/__pycache__", ".venv"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard" # Opções: "off", "basic", "standard", "strict"
+reportMissingImports = false
